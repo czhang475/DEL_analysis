@@ -78,8 +78,7 @@ def calc_3D_sim(ref, test, ref_groups, test_groups, output):
                 dbmol_idx = score.GetMolIdx()
                 #dbmol_confidx = score.GetConfIdx()
     	    #can change to just color or shape Tanimoto
-                new_score = score.GetShapeTanimoto()
-		#new_score = score.GetTanimotoCombo()
+		new_score = score.GetTanimotoCombo()
                 if new_score > output_matrix[dbmol_idx][qmolidx]:
                     output_matrix[dbmol_idx][qmolidx] = new_score
                     #conf_matrix[qmolidx][dbmol_idx] = f'[{q_index}, {dbmol_confidx}]'

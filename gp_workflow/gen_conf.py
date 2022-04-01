@@ -1,7 +1,7 @@
 from openeye import oechem, oeomega
 import numpy as np
 import pandas as pd
-from tools import *
+import tools
 import argparse
 import pickle
 
@@ -13,8 +13,7 @@ def gen_conf(infile, outfile, warnfile, flagfile):
     data = pd.read_csv(infile)
 
     ## Set up error catching
-    fname = warnfile
-    errfs = oechem.oeofstream(fname)
+    errfs = oechem.oeofstream(warnfile)
     oechem.OEThrow.SetOutputStream(errfs)
 
     ## Initialize structures to store information
@@ -24,30 +23,34 @@ def gen_conf(infile, outfile, warnfile, flagfile):
 
     ## Generate conformers for all SMILES strings
     for index, smi in enumerate(data['SMILES']):
-        mol = smiles_to_oemol(smi)
+        mol = tools.smiles_to_oemol(smi)
         oechem.OETriposAtomNames(mol)
-        mol = normalize_molecule(mol)
+        mol = tools.normalize_molecule(mol)
+        cmol = None
         try:
-            mol = generate_conformers(mol, max_confs=200)
+            cmol = tools.generate_conformers(mol, max_confs=200)
             indices.append(index)
-            molecules.append(mol)
+            molecules.append(cmol)
 
         ## if no specified stereochemistry, enumerate stereoisomers and generate conformers for all
         except Exception as e:
             oechem.OEThrow.Warning('Molecule {} returned an error\n{}'.format(index, str(e)))
+
+        if cmol is None:
             for nmol in oeomega.OEFlipper(mol):
-                flip_smiles = oechem.OECreateIsoSmiString(nmol)
-                mol = smiles_to_oemol(flip_smiles)
-                oechem.OETriposAtomNames(mol)
-                mol = generate_conformers(mol, max_confs=200)
-                indices.append(index)
-                molecules.append(mol)
+                oechem.OETriposAtomNames(nmol)
+                try:
+                    tools.generate_conformers(nmol, max_confs=200)
+                    indices.append(index)
+                    molecules.append(nmol)
+                except Exception:
+                    pass
 
     new_table['index'] = indices
     new_table['Molecule'] = molecules
 
     ## Save entire dataframe of generated conformers into database
-    write_dataframe_to_file(new_table, outfile)
+    tools.write_dataframe_to_file(new_table, outfile)
 
     ## Record the compounds with enumerated stereoisomers and their indices for later analysis
     groupings = {}
@@ -71,7 +74,7 @@ def gen_conf(infile, outfile, warnfile, flagfile):
     pickle.dump(groupings, open(flagfile, 'wb'))
 
     ## Read error -- will output in std.out (slurm-{jobnumber}.out) if there are issues with any conformers
-    read_error(warnfile, flagfile) 
+    tools.read_error(warnfile, flagfile)
 
 if __name__ == "__main__":
     my_parser = argparse.ArgumentParser(
